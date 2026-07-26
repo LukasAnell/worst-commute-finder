@@ -4,6 +4,9 @@ from chicago_traffic.models import TrafficSegment
 def get_top_n_worst_segments(
     traffic_segments: list[TrafficSegment], n: int
 ) -> list[TrafficSegment]:
+    if n <= 0:
+        raise ValueError("n must be a positive integer")
+
     # filter traffic segments so only ones with data are present
     valid_traffic_segments: list[TrafficSegment] = [
         segment for segment in traffic_segments if segment.has_data
