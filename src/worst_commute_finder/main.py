@@ -81,7 +81,7 @@ def main():
     if args.verbose:
         print_verbose(n_worst_segments)
     else:
-        print_formatted_data(n_worst_segments)
+        print_compact(n_worst_segments)
 
 
 if __name__ == "__main__":
