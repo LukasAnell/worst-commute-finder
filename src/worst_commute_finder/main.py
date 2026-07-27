@@ -1,7 +1,7 @@
 import csv
 import json
 from argparse import ArgumentParser, Namespace
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from chicago_traffic.client import TrafficClient
@@ -234,10 +234,8 @@ def main():
                 traffic_segments, args.num_segments
             )
         elif args.mode == "relative":
-            # get start date 4 weeks back
-            start: datetime = datetime.now(
-                tz=traffic_segments[0].last_updated.tzinfo
-            ) - timedelta(weeks=4)
+            # get start date 2 weeks back
+            start: datetime = traffic_segments[0].last_updated - timedelta(weeks=2)
 
             # get segment_ids from live traffic segments w/ data
             segment_ids: list[int] = [
