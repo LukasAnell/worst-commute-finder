@@ -9,9 +9,29 @@ from chicago_traffic.models import TrafficAPIError, TrafficSegment
 
 from worst_commute_finder.cache import load_cached_historical, save_historical_cache
 from worst_commute_finder.ranker import (
+    get_top_n_worst_corridors,
     get_top_n_worst_relative,
     get_top_n_worst_segments,
+    group_into_corridors,
 )
+
+
+def corridor_export_to_json(corridors: list[tuple[TrafficSegment, int]], path: str):
+    with open(path, "w") as jsonfile:
+        json.dump(
+            [
+                {
+                    **segment.__dict__,
+                    "segments_in_corridor": count,
+                }
+                for segment, count in corridors
+            ],
+            jsonfile,
+            indent=4,
+            default=lambda o: (
+                o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
+            ),
+        )
 
 
 def relative_export_to_json(segments: list[tuple[TrafficSegment, float]], path: str):
@@ -42,6 +62,39 @@ def absolute_export_to_json(segments: list[TrafficSegment], path: str):
                 o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
             ),
         )
+
+
+def corridor_export_to_csv(corridors: list[tuple[TrafficSegment, int]], path: str):
+    with open(path, "w", newline="") as csvfile:
+        fieldnames = [
+            "segment_id",
+            "street",
+            "direction",
+            "from_street",
+            "to_street",
+            "length",
+            "street_heading",
+            "comments",
+            "start_lon",
+            "start_lat",
+            "end_lon",
+            "end_lat",
+            "current_speed",
+            "segments_in_corridor",
+            "last_updated",
+        ]
+
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for segment, count in corridors:
+            row: dict[str, Any] = segment.__dict__.copy()
+            row["segments_in_corridor"] = count
+
+            if isinstance(row["last_updated"], datetime):
+                row["last_updated"] = row["last_updated"].strftime("%Y-%m-%dT%H:%M:%S")
+
+            writer.writerow(row)
 
 
 def relative_export_to_csv(segments: list[tuple[TrafficSegment, float]], path: str):
@@ -108,6 +161,14 @@ def absolute_export_to_csv(segments: list[TrafficSegment], path: str):
             writer.writerow(row)
 
 
+def corridor_print_compact(corridors: list[tuple[TrafficSegment, int]]):
+    for segment, count in corridors:
+        print(
+            f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): "
+            f"{segment.current_speed} mph (Segments in corridor: {count})"
+        )
+
+
 def relative_print_compact(traffic_segments: list[tuple[TrafficSegment, float]]):
     for segment, speed_diff in traffic_segments:
         print(
@@ -120,6 +181,27 @@ def absolute_print_compact(traffic_segments: list[TrafficSegment]):
     for segment in traffic_segments:
         print(
             f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): {segment.current_speed} mph"
+        )
+
+
+def corridor_print_verbose(corridors: list[tuple[TrafficSegment, int]]):
+    for segment, count in corridors:
+        print(
+            f"Segment ID: {segment.segment_id}, "
+            f"Street: {segment.street}, "
+            f"Direction: {segment.direction}, "
+            f"From: {segment.from_street}, "
+            f"To: {segment.to_street}, "
+            f"Length: {segment.length} miles, "
+            f"Street Heading: {segment.street_heading}, "
+            f"Comments: {segment.comments}, "
+            f"start_lon: {segment.start_lon}, "
+            f"start_lat: {segment.start_lat}, "
+            f"end_lon: {segment.end_lon}, "
+            f"end_lat: {segment.end_lat}, "
+            f"Current Speed: {segment.current_speed} mph, "
+            f"Segments in Corridor: {count}, "
+            f"Last Updated: {segment.last_updated}"
         )
 
 
@@ -209,9 +291,9 @@ def main():
         "-m",
         "--mode",
         type=str,
-        choices=["absolute", "relative"],
+        choices=["absolute", "relative", "corridor"],
         default="absolute",
-        help="Ranking mode: absolute (current speed) or relative (vs. historical baseline)",
+        help="Ranking mode: absolute (current speed), relative (vs. historical baseline), or corridor (grouped by street and direction)",
     )
 
     # parse arguments
@@ -223,6 +305,7 @@ def main():
     # initialize variables for worst segments to prevent unbound errors
     n_worst_segments_absolute: list[TrafficSegment] | None = None
     n_worst_segments_relative: list[tuple[TrafficSegment, float]] | None = None
+    n_worst_corridors: list[tuple[TrafficSegment, int]] | None = None
 
     try:
         # fetch live traffic data from the API
@@ -257,6 +340,12 @@ def main():
             n_worst_segments_relative = get_top_n_worst_relative(
                 traffic_segments, historical_segments, args.num_segments
             )
+        elif args.mode == "corridor":
+            corridors: list[list[TrafficSegment]] = group_into_corridors(
+                traffic_segments
+            )
+
+            n_worst_corridors = get_top_n_worst_corridors(corridors, args.num_segments)
 
     except TrafficAPIError as e:
         print(f"Error fetching traffic data: {e}")
@@ -298,6 +387,26 @@ def main():
                 relative_export_to_json(n_worst_segments_relative, args.export)
             elif args.format == "csv":
                 relative_export_to_csv(n_worst_segments_relative, args.export)
+            else:
+                if args.format is None:
+                    print("Export format not specified. Use '-f json' or '-f csv'.")
+                else:
+                    print(
+                        f"Unsupported export format: {args.format}. Use '-f json' or '-f csv'."
+                    )
+                return
+    elif args.mode == "corridor" and n_worst_corridors is not None:
+        if args.verbose:
+            corridor_print_verbose(n_worst_corridors)
+        else:
+            corridor_print_compact(n_worst_corridors)
+
+        # export if specified
+        if args.export:
+            if args.format == "json":
+                corridor_export_to_json(n_worst_corridors, args.export)
+            elif args.format == "csv":
+                corridor_export_to_csv(n_worst_corridors, args.export)
             else:
                 if args.format is None:
                     print("Export format not specified. Use '-f json' or '-f csv'.")
