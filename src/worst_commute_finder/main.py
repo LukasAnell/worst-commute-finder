@@ -1,9 +1,56 @@
+import csv
+import json
 from argparse import ArgumentParser, Namespace
+from datetime import datetime
+from typing import Any
 
 from chicago_traffic.client import TrafficClient
 from chicago_traffic.models import TrafficAPIError, TrafficSegment
 
 from worst_commute_finder.ranker import get_top_n_worst_segments
+
+
+def export_to_json(segments: list[TrafficSegment], path: str):
+    with open(path, "w") as jsonfile:
+        json.dump(
+            [segment.__dict__ for segment in segments],
+            jsonfile,
+            indent=4,
+            default=lambda o: (
+                o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
+            ),
+        )
+
+
+def export_to_csv(segments: list[TrafficSegment], path: str):
+    with open(path, "w", newline="") as csvfile:
+        fieldnames = [
+            "segment_id",
+            "street",
+            "direction",
+            "from_street",
+            "to_street",
+            "length",
+            "street_heading",
+            "comments",
+            "start_lon",
+            "start_lat",
+            "end_lon",
+            "end_lat",
+            "current_speed",
+            "last_updated",
+        ]
+
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for segment in segments:
+            row: dict[str, Any] = segment.__dict__.copy()
+
+            if isinstance(row["last_updated"], datetime):
+                row["last_updated"] = row["last_updated"].strftime("%Y-%m-%dT%H:%M:%S")
+
+            writer.writerow(row)
 
 
 def print_compact(traffic_segments: list[TrafficSegment]):
@@ -56,6 +103,23 @@ def main():
         help="Display detailed information about each segment",
     )
 
+    # argument for type of output format used in export
+    parser.add_argument(
+        "-f",
+        "--format",
+        type=str,
+        choices=["json", "csv"],
+        help="Output format for export",
+    )
+
+    ## argument for export file path
+    parser.add_argument(
+        "-e",
+        "--export",
+        type=str,
+        help="File path to export the results",
+    )
+
     # parse arguments
     args: Namespace = parser.parse_args()
 
@@ -76,6 +140,21 @@ def main():
     except ValueError as e:
         print(f"Error: {e}")
         return
+
+    # export the results if requested
+    if args.export:
+        if args.format == "json":
+            export_to_json(n_worst_segments, args.export)
+        elif args.format == "csv":
+            export_to_csv(n_worst_segments, args.export)
+        else:
+            if args.format is None:
+                print("Export format not specified. Use '-f json' or '-f csv'.")
+            else:
+                print(
+                    f"Unsupported export format: {args.format}. Use '-f json' or '-f csv'."
+                )
+            return
 
     # print the results
     if args.verbose:
