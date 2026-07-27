@@ -3,6 +3,23 @@ from collections import defaultdict
 from chicago_traffic.models import TrafficSegment
 
 
+def group_into_corridors(
+    traffic_segments: list[TrafficSegment],
+) -> list[list[TrafficSegment]]:
+    # group segments by (street, direction)
+    grouped_segments: dict[tuple[str, str], list[TrafficSegment]] = defaultdict(list)
+    for segment in traffic_segments:
+        grouped_segments[(segment.street, segment.direction)].append(segment)
+
+    return list(grouped_segments.values())
+
+
+def get_top_n_worst_corridors(
+    corridors: list[list[TrafficSegment]], n: int
+) -> list[list[TrafficSegment]]:
+    return list()
+
+
 def get_top_n_worst_relative(
     live_segments: list[TrafficSegment],
     historical_segments: list[TrafficSegment],
