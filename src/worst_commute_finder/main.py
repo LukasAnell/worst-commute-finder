@@ -1,7 +1,7 @@
 import csv
 import json
 from argparse import ArgumentParser, Namespace
-from datetime import datetime, timedelta, tzinfo
+from datetime import datetime, timedelta
 from typing import Any
 
 from chicago_traffic.client import TrafficClient
@@ -13,7 +13,25 @@ from worst_commute_finder.ranker import (
 )
 
 
-def export_to_json(segments: list[TrafficSegment], path: str):
+def relative_export_to_json(segments: list[tuple[TrafficSegment, float]], path: str):
+    with open(path, "w") as jsonfile:
+        json.dump(
+            [
+                {
+                    **segment.__dict__,
+                    "speed_difference_from_historical_average": speed_diff,
+                }
+                for segment, speed_diff in segments
+            ],
+            jsonfile,
+            indent=4,
+            default=lambda o: (
+                o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
+            ),
+        )
+
+
+def absolute_export_to_json(segments: list[TrafficSegment], path: str):
     with open(path, "w") as jsonfile:
         json.dump(
             [segment.__dict__ for segment in segments],
@@ -25,7 +43,40 @@ def export_to_json(segments: list[TrafficSegment], path: str):
         )
 
 
-def export_to_csv(segments: list[TrafficSegment], path: str):
+def relative_export_to_csv(segments: list[tuple[TrafficSegment, float]], path: str):
+    with open(path, "w", newline="") as csvfile:
+        fieldnames = [
+            "segment_id",
+            "street",
+            "direction",
+            "from_street",
+            "to_street",
+            "length",
+            "street_heading",
+            "comments",
+            "start_lon",
+            "start_lat",
+            "end_lon",
+            "end_lat",
+            "current_speed",
+            "speed_difference_from_historical_average",
+            "last_updated",
+        ]
+
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for segment, speed_diff in segments:
+            row: dict[str, Any] = segment.__dict__.copy()
+            row["speed_difference_from_historical_average"] = speed_diff
+
+            if isinstance(row["last_updated"], datetime):
+                row["last_updated"] = row["last_updated"].strftime("%Y-%m-%dT%H:%M:%S")
+
+            writer.writerow(row)
+
+
+def absolute_export_to_csv(segments: list[TrafficSegment], path: str):
     with open(path, "w", newline="") as csvfile:
         fieldnames = [
             "segment_id",
@@ -56,14 +107,43 @@ def export_to_csv(segments: list[TrafficSegment], path: str):
             writer.writerow(row)
 
 
-def print_compact(traffic_segments: list[TrafficSegment]):
+def relative_print_compact(traffic_segments: list[tuple[TrafficSegment, float]]):
+    for segment, speed_diff in traffic_segments:
+        print(
+            f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): "
+            f"{segment.current_speed} mph (Speed Difference: {speed_diff:.2f} mph)"
+        )
+
+
+def absolute_print_compact(traffic_segments: list[TrafficSegment]):
     for segment in traffic_segments:
         print(
             f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): {segment.current_speed} mph"
         )
 
 
-def print_verbose(traffic_segments: list[TrafficSegment]):
+def relative_print_verbose(traffic_segments: list[tuple[TrafficSegment, float]]):
+    for segment, speed_diff in traffic_segments:
+        print(
+            f"Segment ID: {segment.segment_id}, "
+            f"Street: {segment.street}, "
+            f"Direction: {segment.direction}, "
+            f"From: {segment.from_street}, "
+            f"To: {segment.to_street}, "
+            f"Length: {segment.length} miles, "
+            f"Street Heading: {segment.street_heading}, "
+            f"Comments: {segment.comments}, "
+            f"start_lon: {segment.start_lon}, "
+            f"start_lat: {segment.start_lat}, "
+            f"end_lon: {segment.end_lon}, "
+            f"end_lat: {segment.end_lat}, "
+            f"Current Speed: {segment.current_speed} mph, "
+            f"Speed Difference from Historical Average: {speed_diff:.2f} mph, "
+            f"Last Updated: {segment.last_updated}"
+        )
+
+
+def absolute_print_verbose(traffic_segments: list[TrafficSegment]):
     for segment in traffic_segments:
         print(
             f"Segment ID: {segment.segment_id}, "
@@ -182,9 +262,9 @@ def main():
     # export the results if requested
     if args.export:
         if args.format == "json":
-            export_to_json(n_worst_segments, args.export)
+            absolute_export_to_json(n_worst_segments, args.export)
         elif args.format == "csv":
-            export_to_csv(n_worst_segments, args.export)
+            absolute_export_to_csv(n_worst_segments, args.export)
         else:
             if args.format is None:
                 print("Export format not specified. Use '-f json' or '-f csv'.")
@@ -196,7 +276,7 @@ def main():
 
     # print the results
     if args.verbose:
-        print_verbose(n_worst_segments)
+        absolute_print_verbose(n_worst_segments)
     else:
         print_compact(n_worst_segments)
 
