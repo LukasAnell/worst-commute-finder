@@ -9,7 +9,7 @@ from worst_commute_finder.ranker import get_top_n_worst_segments
 def print_compact(traffic_segments: list[TrafficSegment]):
     for segment in traffic_segments:
         print(
-            f"{segment.street} ({segment.from_street} -> {segment.to_street}): {segment.current_speed} mph"
+            f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): {segment.current_speed} mph"
         )
 
 
