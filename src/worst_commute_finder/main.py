@@ -6,7 +6,14 @@ from chicago_traffic.models import TrafficAPIError, TrafficSegment
 from worst_commute_finder.ranker import get_top_n_worst_segments
 
 
-def print_formatted_data(traffic_segments: list[TrafficSegment]):
+def print_compact(traffic_segments: list[TrafficSegment]):
+    for segment in traffic_segments:
+        print(
+            f"{segment.street} ({segment.from_street} -> {segment.to_street}): {segment.current_speed} mph"
+        )
+
+
+def print_verbose(traffic_segments: list[TrafficSegment]):
     for segment in traffic_segments:
         print(
             f"Segment ID: {segment.segment_id}, "
@@ -41,6 +48,14 @@ def main():
         help="Number of worst segments to display",
     )
 
+    # add argument for verbose output
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Display detailed information about each segment",
+    )
+
     # parse arguments
     args: Namespace = parser.parse_args()
 
@@ -62,7 +77,11 @@ def main():
         print(f"Error: {e}")
         return
 
-    print_formatted_data(n_worst_segments)
+    # print the results
+    if args.verbose:
+        print_verbose(n_worst_segments)
+    else:
+        print_formatted_data(n_worst_segments)
 
 
 if __name__ == "__main__":
