@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from chicago_traffic.models import TrafficSegment
 
 
@@ -19,35 +21,36 @@ def get_top_n_worst_relative(
     ]
 
     # create a dict of historical segments mapping segment_id to a list of speed readings
-    historical_speed_dict: dict[int, list[float]] = {}
+    historical_speed_dict: dict[tuple[int, int, int], list[float]] = defaultdict(list)
 
     for segment in valid_historical_segments:
-        # check that the historical segment is from the same day of the week and roughly the same hour as the live segment
-        if (
-            segment.last_updated.weekday == segment.last_updated.weekday
-            and abs(segment.last_updated.hour - segment.last_updated.hour) <= 1
-        ):
-            if segment.segment_id not in historical_speed_dict:
-                historical_speed_dict[segment.segment_id] = []
-
-            historical_speed_dict[segment.segment_id].append(segment.current_speed)
+        key: tuple[int, int, int] = (
+            segment.segment_id,
+            segment.last_updated.weekday(),
+            segment.last_updated.hour,
+        )
+        historical_speed_dict[key].append(segment.current_speed)
 
     # if there are more than 3 speed readings for a segment, store the average in another dict
-    average_historical_speed_dict: dict[int, float] = {}
-
-    for segment_id, speeds in historical_speed_dict.items():
-        if len(speeds) >= 3:
-            average_historical_speed_dict[segment_id] = sum(speeds) / len(speeds)
+    average_historical_speed_dict: dict[tuple[int, int, int], float] = {
+        key: sum(speeds) / len(speeds)
+        for key, speeds in historical_speed_dict.items()
+        if len(speeds) >= 3
+    }
 
     # compute speed difference for each live segment that has a corresponding historical average
     speed_diff_list: list[tuple[TrafficSegment, float]] = []
     for segment in valid_live_segments:
-        if segment.segment_id in average_historical_speed_dict:
-            speed_diff = (
-                segment.current_speed
-                - average_historical_speed_dict[segment.segment_id]
-            )
+        key = (
+            segment.segment_id,
+            segment.last_updated.weekday(),
+            segment.last_updated.hour,
+        )
 
+        if key in average_historical_speed_dict:
+            speed_diff: float = (
+                segment.current_speed - average_historical_speed_dict[key]
+            )
             speed_diff_list.append((segment, speed_diff))
 
     # sort the list by speed difference
