@@ -1,3 +1,5 @@
+import csv
+import json
 from argparse import ArgumentParser, Namespace
 
 from chicago_traffic.client import TrafficClient
@@ -7,8 +9,6 @@ from worst_commute_finder.ranker import get_top_n_worst_segments
 
 
 def export_to_json(segments: list[TrafficSegment], path: str):
-    import json
-
     with open(path, "w") as jsonfile:
         json.dump(
             [segment.__dict__ for segment in segments], jsonfile, indent=4, default=str
@@ -16,8 +16,6 @@ def export_to_json(segments: list[TrafficSegment], path: str):
 
 
 def export_to_csv(segments: list[TrafficSegment], path: str):
-    import csv
-
     with open(path, "w", newline="") as csvfile:
         fieldnames = [
             "segment_id",
