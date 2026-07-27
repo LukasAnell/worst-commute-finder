@@ -16,6 +16,24 @@ from worst_commute_finder.ranker import (
 )
 
 
+def corridor_export_to_json(corridors: list[tuple[TrafficSegment, int]], path: str):
+    with open(path, "w") as jsonfile:
+        json.dump(
+            [
+                {
+                    **segment.__dict__,
+                    "segments_in_corridor": count,
+                }
+                for segment, count in corridors
+            ],
+            jsonfile,
+            indent=4,
+            default=lambda o: (
+                o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
+            ),
+        )
+
+
 def relative_export_to_json(segments: list[tuple[TrafficSegment, float]], path: str):
     with open(path, "w") as jsonfile:
         json.dump(
@@ -44,6 +62,39 @@ def absolute_export_to_json(segments: list[TrafficSegment], path: str):
                 o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
             ),
         )
+
+
+def corridor_export_to_csv(corridors: list[tuple[TrafficSegment, int]], path: str):
+    with open(path, "w", newline="") as csvfile:
+        fieldnames = [
+            "segment_id",
+            "street",
+            "direction",
+            "from_street",
+            "to_street",
+            "length",
+            "street_heading",
+            "comments",
+            "start_lon",
+            "start_lat",
+            "end_lon",
+            "end_lat",
+            "current_speed",
+            "segments_in_corridor",
+            "last_updated",
+        ]
+
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for segment, count in corridors:
+            row: dict[str, Any] = segment.__dict__.copy()
+            row["segments_in_corridor"] = count
+
+            if isinstance(row["last_updated"], datetime):
+                row["last_updated"] = row["last_updated"].strftime("%Y-%m-%dT%H:%M:%S")
+
+            writer.writerow(row)
 
 
 def relative_export_to_csv(segments: list[tuple[TrafficSegment, float]], path: str):
@@ -336,6 +387,26 @@ def main():
                 relative_export_to_json(n_worst_segments_relative, args.export)
             elif args.format == "csv":
                 relative_export_to_csv(n_worst_segments_relative, args.export)
+            else:
+                if args.format is None:
+                    print("Export format not specified. Use '-f json' or '-f csv'.")
+                else:
+                    print(
+                        f"Unsupported export format: {args.format}. Use '-f json' or '-f csv'."
+                    )
+                return
+    elif args.mode == "corridor" and n_worst_corridors is not None:
+        if args.verbose:
+            corridor_print_verbose(n_worst_corridors)
+        else:
+            corridor_print_compact(n_worst_corridors)
+
+        # export if specified
+        if args.export:
+            if args.format == "json":
+                corridor_export_to_json(n_worst_corridors, args.export)
+            elif args.format == "csv":
+                corridor_export_to_csv(n_worst_corridors, args.export)
             else:
                 if args.format is None:
                     print("Export format not specified. Use '-f json' or '-f csv'.")
