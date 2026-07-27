@@ -3,7 +3,6 @@ from datetime import UTC, datetime
 import pytest
 from chicago_traffic.models import TrafficSegment
 
-import worst_commute_finder
 from worst_commute_finder.ranker import (
     get_top_n_worst_corridors,
     get_top_n_worst_relative,
@@ -21,6 +20,13 @@ def make_segment(
     current_speed=10.0,
     has_data=True,
     last_updated=None,
+    length=0.5,
+    street_heading="N",
+    comments=None,
+    start_lon=-87.65,
+    start_lat=41.85,
+    end_lon=-87.65,
+    end_lat=41.86,
     **overrides,
 ) -> TrafficSegment:
     """Helper to build a TrafficSegment object"""
@@ -33,6 +39,13 @@ def make_segment(
         direction=direction,
         from_street=from_street,
         to_street=to_street,
+        length=length,
+        street_heading=street_heading,
+        comments=comments,
+        start_lon=start_lon,
+        start_lat=start_lat,
+        end_lon=end_lon,
+        end_lat=end_lat,
         current_speed=current_speed if has_data else -1,
         last_updated=last_updated,
         **overrides,

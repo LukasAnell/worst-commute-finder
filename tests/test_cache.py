@@ -133,7 +133,7 @@ def test_load_returns_none_on_missing_keys(isolated_cache):
 
 def test_save_creates_cache_directory_if_missing(tmp_path, monkeypatch):
     """.cache/ directory is created if it doesn't already exist."""
-    cache_file = tmp_path / "historical_speeds.json"
+    cache_file = tmp_path / "nested" / "historical_speeds.json"
     monkeypatch.setattr("worst_commute_finder.cache.CACHE_PATH", cache_file)
 
     cache_dir = cache_file.parent

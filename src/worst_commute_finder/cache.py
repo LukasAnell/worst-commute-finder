@@ -49,7 +49,7 @@ def save_historical_cache(segments: list[TrafficSegment]) -> None:
         ],
     }
 
-    Path(".cache").mkdir(exist_ok=True)
+    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with open(CACHE_PATH, "w") as f:
         json.dump(dict_to_cache, f)
