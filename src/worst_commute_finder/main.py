@@ -274,6 +274,14 @@ def main():
                 absolute_export_to_json(n_worst_segments_absolute, args.export)
             elif args.format == "csv":
                 absolute_export_to_csv(n_worst_segments_absolute, args.export)
+            else:
+                if args.format is None:
+                    print("Export format not specified. Use '-f json' or '-f csv'.")
+                else:
+                    print(
+                        f"Unsupported export format: {args.format}. Use '-f json' or '-f csv'."
+                    )
+                return
     elif args.mode == "relative" and n_worst_segments_relative is not None:
         if args.verbose:
             relative_print_verbose(n_worst_segments_relative)
@@ -286,6 +294,14 @@ def main():
                 relative_export_to_json(n_worst_segments_relative, args.export)
             elif args.format == "csv":
                 relative_export_to_csv(n_worst_segments_relative, args.export)
+            else:
+                if args.format is None:
+                    print("Export format not specified. Use '-f json' or '-f csv'.")
+                else:
+                    print(
+                        f"Unsupported export format: {args.format}. Use '-f json' or '-f csv'."
+                    )
+                return
 
 
 if __name__ == "__main__":
