@@ -2,6 +2,7 @@ import csv
 import json
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
+from typing import Any
 
 from chicago_traffic.client import TrafficClient
 from chicago_traffic.models import TrafficAPIError, TrafficSegment
@@ -41,10 +42,15 @@ def export_to_csv(segments: list[TrafficSegment], path: str):
         ]
 
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
         writer.writeheader()
+
         for segment in segments:
-            writer.writerow(segment.__dict__)
+            row: dict[str, Any] = segment.__dict__.copy()
+
+            if isinstance(row["last_updated"], datetime):
+                row["last_updated"] = row["last_updated"].strftime("%Y-%m-%dT%H:%M:%S")
+
+            writer.writerow(row)
 
 
 def print_compact(traffic_segments: list[TrafficSegment]):
