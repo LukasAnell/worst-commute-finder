@@ -11,6 +11,8 @@ jobs:
         steps:
             - name: Checkout worst-commute-finder
               uses: actions/checkout@v4
+              with:
+                  path: worst-commute-finder
 
             - name: Checkout chicago-traffic
               uses: actions/checkout@v4
@@ -24,10 +26,9 @@ jobs:
                   python-version: "3.14"
 
             - name: Install dependencies
+              working-directory: worst-commute-finder
               run: uv sync
 
-            - name: Install chicago-traffic (editable)
-              run: uv add --editable ./chicago-traffic
-
             - name: Run tests
+              working-directory: worst-commute-finder
               run: uv run pytest
