@@ -288,7 +288,7 @@ def test_get_top_n_worst_relative_computes_speed_difference():
     )  # slowest relative to historical average
     assert worst_relative[0][1] == -30.0  # 5 - 35
     assert worst_relative[1][0].segment_id == 1
-    assert worst_relative[1][1] == -15.0  # 10 - 20
+    assert worst_relative[1][1] == -10.0  # 10 - 20
 
 
 def test_get_top_n_worst_relative_excludes_no_data_live_and_historical():
@@ -313,7 +313,7 @@ def test_get_top_n_worst_relative_excludes_no_data_live_and_historical():
 
     assert len(worst_relative) == 1
     assert worst_relative[0][0].segment_id == 1
-    assert worst_relative[0][1] == -15.0  # 10 - 20
+    assert worst_relative[0][1] == -10.0  # 10 - 20
 
 
 def test_get_top_n_worst_relative_no_matching_historical_key_excluded():
@@ -335,7 +335,7 @@ def test_get_top_n_worst_relative_no_matching_historical_key_excluded():
 
     assert len(worst_relative) == 1
     assert worst_relative[0][0].segment_id == 1
-    assert worst_relative[0][1] == -15.0  # 10 - 20
+    assert worst_relative[0][1] == -10.0  # 10 - 20
 
 
 def test_get_top_n_worst_relative_n_zero_or_negative_raises():
