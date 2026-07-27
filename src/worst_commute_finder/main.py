@@ -1,3 +1,5 @@
+from argparse import ArgumentParser, Namespace
+
 from chicago_traffic.client import TrafficClient
 from chicago_traffic.models import TrafficAPIError, TrafficSegment
 
@@ -25,6 +27,24 @@ def print_formatted_data(traffic_segments: list[TrafficSegment]):
 
 
 def main():
+    # set up argument parser
+    parser: ArgumentParser = ArgumentParser(
+        description="Fetch and display the top 10 worst traffic segments in Chicago."
+    )
+
+    # add argument for number of worst segments to display
+    parser.add_argument(
+        "-n",
+        "--num-segments",
+        type=int,
+        default=10,
+        help="Number of worst segments to display",
+    )
+
+    # parse arguments
+    args: Namespace = parser.parse_args()
+
+    # create a TrafficClient instance
     client: TrafficClient = TrafficClient()
 
     try:
@@ -33,10 +53,13 @@ def main():
 
         # get the top 10 worst segments based on current speed
         n_worst_segments: list[TrafficSegment] = get_top_n_worst_segments(
-            traffic_segments, 10
+            traffic_segments, args.num_segments
         )
     except TrafficAPIError as e:
         print(f"Error fetching traffic data: {e}")
+        return
+    except ValueError as e:
+        print(f"Error: {e}")
         return
 
     print_formatted_data(n_worst_segments)
