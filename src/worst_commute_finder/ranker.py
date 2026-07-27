@@ -32,7 +32,32 @@ def get_top_n_worst_relative(
 
             historical_speed_dict[segment.segment_id].append(segment.current_speed)
 
-    return list()
+    # if there are more than 3 speed readings for a segment, store the average in another dict
+    average_historical_speed_dict: dict[int, float] = {}
+
+    for segment_id, speeds in historical_speed_dict.items():
+        if len(speeds) >= 3:
+            average_historical_speed_dict[segment_id] = sum(speeds) / len(speeds)
+
+    # compute speed difference for each live segment that has a corresponding historical average
+    speed_diff_list: list[tuple[TrafficSegment, float]] = []
+    for segment in valid_live_segments:
+        if segment.segment_id in average_historical_speed_dict:
+            speed_diff = (
+                segment.current_speed
+                - average_historical_speed_dict[segment.segment_id]
+            )
+
+            speed_diff_list.append((segment, speed_diff))
+
+    # sort the list by speed difference
+    speed_diff_list.sort(key=lambda x: x[1])
+
+    # only return the top n segments
+    if len(speed_diff_list) >= n:
+        return speed_diff_list[:n]
+
+    return speed_diff_list
 
 
 def get_top_n_worst_segments(
