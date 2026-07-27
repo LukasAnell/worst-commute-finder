@@ -16,8 +16,36 @@ def group_into_corridors(
 
 def get_top_n_worst_corridors(
     corridors: list[list[TrafficSegment]], n: int
-) -> list[list[TrafficSegment]]:
-    return list()
+) -> list[tuple[TrafficSegment, int]]:
+    if n <= 0:
+        raise ValueError("n must be a positive integer")
+
+    worst_per_corridor: list[tuple[TrafficSegment, int]] = []
+
+    for group in corridors:
+        # filter out segments without data
+        group[:] = [segment for segment in group if segment.has_data]
+
+        # skip groups with no data
+        if not group:
+            continue
+
+        # find the worst segment in the group, and the group's size
+        worst_segment: TrafficSegment = min(
+            group, key=lambda segment: segment.current_speed
+        )
+        segment_count: int = len(group)
+
+        worst_per_corridor.append((worst_segment, segment_count))
+
+    # sort by the worst segment's speed
+    worst_per_corridor.sort(key=lambda x: x[0].current_speed)
+
+    # return top n corridors
+    if len(worst_per_corridor) >= n:
+        return worst_per_corridor[:n]
+
+    return worst_per_corridor
 
 
 def get_top_n_worst_relative(
