@@ -136,7 +136,12 @@ def main():
         elif args.format == "csv":
             export_to_csv(n_worst_segments, args.export)
         else:
-            print("Invalid export format specified. Use 'json' or 'csv'.")
+            if args.format is None:
+                print("Export format not specified. Use '-f json' or '-f csv'.")
+            else:
+                print(
+                    f"Unsupported export format: {args.format}. Use '-f json' or '-f csv'."
+                )
             return
 
     # print the results
