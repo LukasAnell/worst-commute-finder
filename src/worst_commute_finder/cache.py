@@ -4,13 +4,15 @@ from pathlib import Path
 
 from chicago_traffic.models import TrafficSegment
 
+CACHE_PATH = Path(".cache/historical_speeds.json")
+
 
 def load_cached_historical(max_age: timedelta) -> list[TrafficSegment] | None:
-    if not Path(".cache/historical_speeds.json").exists():
+    if not Path(CACHE_PATH).exists():
         return None
 
     try:
-        with open(".cache/historical_speeds.json", "r") as f:
+        with open(CACHE_PATH, "r") as f:
             cached_data = json.load(f)
 
         cached_timestamp = datetime.fromisoformat(cached_data["timestamp"])
@@ -49,5 +51,5 @@ def save_historical_cache(segments: list[TrafficSegment]) -> None:
 
     Path(".cache").mkdir(exist_ok=True)
 
-    with open(".cache/historical_speeds.json", "w") as f:
+    with open(CACHE_PATH, "w") as f:
         json.dump(dict_to_cache, f)
