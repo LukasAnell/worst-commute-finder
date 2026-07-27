@@ -1,12 +1,13 @@
 import csv
 import json
 from argparse import ArgumentParser, Namespace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from chicago_traffic.client import TrafficClient
 from chicago_traffic.models import TrafficAPIError, TrafficSegment
 
+from worst_commute_finder.cache import load_cached_historical, save_historical_cache
 from worst_commute_finder.ranker import (
     get_top_n_worst_relative,
     get_top_n_worst_segments,
@@ -242,10 +243,15 @@ def main():
                 segment.segment_id for segment in traffic_segments if segment.has_data
             ]
 
-            # get historical traffic data
-            historical_segments: list[TrafficSegment] = client.get_historical_speeds(
-                start=start, segment_ids=segment_ids
-            )
+            # get historical traffic data from cache first, then from API if not cached or cache is too old
+            historical_segments = load_cached_historical(max_age=timedelta(hours=6))
+
+            if historical_segments is None:
+                historical_segments = client.get_historical_speeds(
+                    start=start, segment_ids=segment_ids
+                )
+
+                save_historical_cache(historical_segments)
 
             # get worst relative segments
             n_worst_segments_relative = get_top_n_worst_relative(
