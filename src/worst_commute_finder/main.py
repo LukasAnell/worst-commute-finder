@@ -1,13 +1,16 @@
 import csv
 import json
 from argparse import ArgumentParser, Namespace
-from datetime import datetime
+from datetime import datetime, timedelta, tzinfo
 from typing import Any
 
 from chicago_traffic.client import TrafficClient
 from chicago_traffic.models import TrafficAPIError, TrafficSegment
 
-from worst_commute_finder.ranker import get_top_n_worst_segments
+from worst_commute_finder.ranker import (
+    get_top_n_worst_relative,
+    get_top_n_worst_segments,
+)
 
 
 def export_to_json(segments: list[TrafficSegment], path: str):
@@ -112,12 +115,22 @@ def main():
         help="Output format for export",
     )
 
-    ## argument for export file path
+    # argument for export file path
     parser.add_argument(
         "-e",
         "--export",
         type=str,
         help="File path to export the results",
+    )
+
+    # argument for what type of ranking mode to use
+    parser.add_argument(
+        "-m",
+        "--mode",
+        type=str,
+        choices=["absolute", "relative"],
+        default="absolute",
+        help="Ranking mode: absolute (current speed) or relative (vs. historical baseline)",
     )
 
     # parse arguments
@@ -130,10 +143,35 @@ def main():
         # fetch live traffic data from the API
         traffic_segments: list[TrafficSegment] = client.get_live_speeds()
 
-        # get the top 10 worst segments based on current speed
-        n_worst_segments: list[TrafficSegment] = get_top_n_worst_segments(
-            traffic_segments, args.num_segments
-        )
+        # branch for absolute vs. relative ranking mode
+        if args.mode == "absolute":
+            # get the top 10 worst segments based on current speed
+            n_worst_segments_absolute: list[TrafficSegment] = get_top_n_worst_segments(
+                traffic_segments, args.num_segments
+            )
+        elif args.mode == "relative":
+            # get start date 4 weeks back
+            start: datetime = datetime.now(
+                tz=traffic_segments[0].last_updated.tzinfo
+            ) - timedelta(weeks=4)
+
+            # get segment_ids from live traffic segments w/ data
+            segment_ids: list[int] = [
+                segment.segment_id for segment in traffic_segments if segment.has_data
+            ]
+
+            # get historical traffic data
+            historical_segments: list[TrafficSegment] = client.get_historical_speeds(
+                start=start, segment_ids=segment_ids
+            )
+
+            # get worst relative segments
+            n_worst_segments_relative: list[tuple[TrafficSegment, float]] = (
+                get_top_n_worst_relative(
+                    traffic_segments, historical_segments, args.num_segments
+                )
+            )
+
     except TrafficAPIError as e:
         print(f"Error fetching traffic data: {e}")
         return
