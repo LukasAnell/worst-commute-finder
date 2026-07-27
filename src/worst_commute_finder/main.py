@@ -1,6 +1,7 @@
 import csv
 import json
 from argparse import ArgumentParser, Namespace
+from datetime import datetime
 
 from chicago_traffic.client import TrafficClient
 from chicago_traffic.models import TrafficAPIError, TrafficSegment
@@ -11,7 +12,12 @@ from worst_commute_finder.ranker import get_top_n_worst_segments
 def export_to_json(segments: list[TrafficSegment], path: str):
     with open(path, "w") as jsonfile:
         json.dump(
-            [segment.__dict__ for segment in segments], jsonfile, indent=4, default=str
+            [segment.__dict__ for segment in segments],
+            jsonfile,
+            indent=4,
+            default=lambda o: (
+                o.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(o, datetime) else str(o)
+            ),
         )
 
 
