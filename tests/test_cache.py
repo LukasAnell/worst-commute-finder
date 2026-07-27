@@ -1,5 +1,5 @@
-from datetime import UTC, datetime, timedelta, timezone
-from pathlib import Path
+import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from chicago_traffic.models import TrafficSegment
@@ -56,21 +56,23 @@ def test_load_returns_none_when_file_missing(isolated_cache):
     assert loaded_segments is None
 
 
-def test_load_returns_none_when_stale(isolated_cache, monkeypatch):
+def test_load_returns_none_when_stale(isolated_cache):
     """Cache older than max_age returns None (treated as a miss)."""
-    # TODO: write a cache with an old timestamp, then call load_cached_historical
-    # with a max_age smaller than the elapsed time
     old_cache_segments: list[TrafficSegment] = [
-        make_segment(
-            segment_id=1,
-            current_speed=20.0,
-            last_updated=datetime.now(UTC) - timedelta(days=2),
-        ),
+        make_segment(segment_id=1, current_speed=20.0),
     ]
 
     save_historical_cache(old_cache_segments)
 
     assert isolated_cache.exists()
+
+    with open(isolated_cache, "r") as f:
+        cached_data = json.load(f)
+
+    cached_data["timestamp"] = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+
+    with open(isolated_cache, "w") as f:
+        json.dump(cached_data, f)
 
     loaded_segments: list[TrafficSegment] | None = load_cached_historical(
         max_age=timedelta(days=1)
@@ -105,7 +107,7 @@ def test_load_returns_segments_when_fresh(isolated_cache):
 
 def test_load_returns_none_on_corrupted_json(isolated_cache):
     """Malformed/corrupted cache file is treated as a miss, not an unhandled exception."""
-    # Write a corrupted JSON file
+
     with open(isolated_cache, "w") as f:
         f.write("{ this is not valid JSON }")
 
@@ -118,7 +120,7 @@ def test_load_returns_none_on_corrupted_json(isolated_cache):
 
 def test_load_returns_none_on_missing_keys(isolated_cache):
     """Cache file missing expected keys (e.g. 'segments' or 'timestamp') is treated as a miss."""
-    # Write a JSON file missing the 'segments' key
+
     with open(isolated_cache, "w") as f:
         f.write('{"timestamp": "2024-01-01T00:00:00Z"}')
 
@@ -134,7 +136,6 @@ def test_save_creates_cache_directory_if_missing(tmp_path, monkeypatch):
     cache_file = tmp_path / "historical_speeds.json"
     monkeypatch.setattr("worst_commute_finder.cache.CACHE_PATH", cache_file)
 
-    # Ensure the .cache directory does not exist
     cache_dir = cache_file.parent
     assert not cache_dir.exists()
 
@@ -144,5 +145,5 @@ def test_save_creates_cache_directory_if_missing(tmp_path, monkeypatch):
 
     save_historical_cache(segments_to_save)
 
-    # After saving, the .cache directory should exist
     assert cache_dir.exists()
+    assert cache_file.exists()
