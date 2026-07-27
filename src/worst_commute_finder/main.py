@@ -9,8 +9,10 @@ from chicago_traffic.models import TrafficAPIError, TrafficSegment
 
 from worst_commute_finder.cache import load_cached_historical, save_historical_cache
 from worst_commute_finder.ranker import (
+    get_top_n_worst_corridors,
     get_top_n_worst_relative,
     get_top_n_worst_segments,
+    group_into_corridors,
 )
 
 
@@ -108,6 +110,14 @@ def absolute_export_to_csv(segments: list[TrafficSegment], path: str):
             writer.writerow(row)
 
 
+def corridor_print_compact(corridors: list[tuple[TrafficSegment, int]]):
+    for segment, count in corridors:
+        print(
+            f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): "
+            f"{segment.current_speed} mph (Segments in corridor: {count})"
+        )
+
+
 def relative_print_compact(traffic_segments: list[tuple[TrafficSegment, float]]):
     for segment, speed_diff in traffic_segments:
         print(
@@ -120,6 +130,27 @@ def absolute_print_compact(traffic_segments: list[TrafficSegment]):
     for segment in traffic_segments:
         print(
             f"{segment.street} {segment.direction} ({segment.from_street} -> {segment.to_street}): {segment.current_speed} mph"
+        )
+
+
+def corridor_print_verbose(corridors: list[tuple[TrafficSegment, int]]):
+    for segment, count in corridors:
+        print(
+            f"Segment ID: {segment.segment_id}, "
+            f"Street: {segment.street}, "
+            f"Direction: {segment.direction}, "
+            f"From: {segment.from_street}, "
+            f"To: {segment.to_street}, "
+            f"Length: {segment.length} miles, "
+            f"Street Heading: {segment.street_heading}, "
+            f"Comments: {segment.comments}, "
+            f"start_lon: {segment.start_lon}, "
+            f"start_lat: {segment.start_lat}, "
+            f"end_lon: {segment.end_lon}, "
+            f"end_lat: {segment.end_lat}, "
+            f"Current Speed: {segment.current_speed} mph, "
+            f"Segments in Corridor: {count}, "
+            f"Last Updated: {segment.last_updated}"
         )
 
 
@@ -209,9 +240,9 @@ def main():
         "-m",
         "--mode",
         type=str,
-        choices=["absolute", "relative"],
+        choices=["absolute", "relative", "corridor"],
         default="absolute",
-        help="Ranking mode: absolute (current speed) or relative (vs. historical baseline)",
+        help="Ranking mode: absolute (current speed), relative (vs. historical baseline), or corridor (grouped by street and direction)",
     )
 
     # parse arguments
@@ -223,6 +254,7 @@ def main():
     # initialize variables for worst segments to prevent unbound errors
     n_worst_segments_absolute: list[TrafficSegment] | None = None
     n_worst_segments_relative: list[tuple[TrafficSegment, float]] | None = None
+    n_worst_corridors: list[tuple[TrafficSegment, int]] | None = None
 
     try:
         # fetch live traffic data from the API
@@ -257,6 +289,12 @@ def main():
             n_worst_segments_relative = get_top_n_worst_relative(
                 traffic_segments, historical_segments, args.num_segments
             )
+        elif args.mode == "corridor":
+            corridors: list[list[TrafficSegment]] = group_into_corridors(
+                traffic_segments
+            )
+
+            n_worst_corridors = get_top_n_worst_corridors(corridors, args.num_segments)
 
     except TrafficAPIError as e:
         print(f"Error fetching traffic data: {e}")
