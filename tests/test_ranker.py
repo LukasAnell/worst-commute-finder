@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from chicago_traffic.models import TrafficSegment
@@ -242,15 +242,25 @@ def test_get_top_n_worst_corridors_n_zero_or_negative_raises():
 def test_get_top_n_worst_relative_excludes_fewer_than_three_readings():
     """A segment/weekday/hour key with fewer than 3 historical readings has no
     average computed, so live segments matching that key are excluded from results."""
+    live_time = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)  # arbitrary fixed Monday 8am
+
     live_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=10.0),
-        make_segment(segment_id=2, current_speed=5.0),
+        make_segment(segment_id=1, current_speed=10.0, last_updated=live_time),
+        make_segment(segment_id=2, current_speed=5.0, last_updated=live_time),
     ]
 
     historical_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=15.0),
-        make_segment(segment_id=1, current_speed=20.0),
-        make_segment(segment_id=2, current_speed=25.0),
+        make_segment(
+            segment_id=1, current_speed=15.0, last_updated=live_time - timedelta(days=7)
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=20.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=2, current_speed=25.0, last_updated=live_time - timedelta(days=7)
+        ),
     ]
 
     worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
@@ -264,18 +274,40 @@ def test_get_top_n_worst_relative_excludes_fewer_than_three_readings():
 
 def test_get_top_n_worst_relative_computes_speed_difference():
     """speed_diff = live current_speed - historical average for matching (segment_id, weekday, hour)."""
+    live_time = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)
+
     live_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=10.0),
-        make_segment(segment_id=2, current_speed=5.0),
+        make_segment(segment_id=1, current_speed=10.0, last_updated=live_time),
+        make_segment(segment_id=2, current_speed=5.0, last_updated=live_time),
     ]
 
     historical_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=15.0),
-        make_segment(segment_id=1, current_speed=20.0),
-        make_segment(segment_id=1, current_speed=25.0),
-        make_segment(segment_id=2, current_speed=30.0),
-        make_segment(segment_id=2, current_speed=35.0),
-        make_segment(segment_id=2, current_speed=40.0),
+        make_segment(
+            segment_id=1, current_speed=15.0, last_updated=live_time - timedelta(days=7)
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=20.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=25.0,
+            last_updated=live_time - timedelta(days=21),
+        ),
+        make_segment(
+            segment_id=2, current_speed=30.0, last_updated=live_time - timedelta(days=7)
+        ),
+        make_segment(
+            segment_id=2,
+            current_speed=35.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=2,
+            current_speed=40.0,
+            last_updated=live_time - timedelta(days=21),
+        ),
     ]
 
     worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
@@ -293,18 +325,54 @@ def test_get_top_n_worst_relative_computes_speed_difference():
 
 def test_get_top_n_worst_relative_excludes_no_data_live_and_historical():
     """has_data=False segments excluded from both live and historical inputs."""
+    live_time = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)
+
     live_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=10.0, has_data=True),
-        make_segment(segment_id=2, current_speed=5.0, has_data=False),
+        make_segment(
+            segment_id=1, current_speed=10.0, has_data=True, last_updated=live_time
+        ),
+        make_segment(
+            segment_id=2, current_speed=5.0, has_data=False, last_updated=live_time
+        ),
     ]
 
     historical_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=15.0, has_data=True),
-        make_segment(segment_id=1, current_speed=20.0, has_data=True),
-        make_segment(segment_id=1, current_speed=25.0, has_data=True),
-        make_segment(segment_id=2, current_speed=30.0, has_data=False),
-        make_segment(segment_id=2, current_speed=35.0, has_data=False),
-        make_segment(segment_id=2, current_speed=40.0, has_data=False),
+        make_segment(
+            segment_id=1,
+            current_speed=15.0,
+            has_data=True,
+            last_updated=live_time - timedelta(days=7),
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=20.0,
+            has_data=True,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=25.0,
+            has_data=True,
+            last_updated=live_time - timedelta(days=21),
+        ),
+        make_segment(
+            segment_id=2,
+            current_speed=30.0,
+            has_data=False,
+            last_updated=live_time - timedelta(days=7),
+        ),
+        make_segment(
+            segment_id=2,
+            current_speed=35.0,
+            has_data=False,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=2,
+            current_speed=40.0,
+            has_data=False,
+            last_updated=live_time - timedelta(days=21),
+        ),
     ]
 
     worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
@@ -318,15 +386,27 @@ def test_get_top_n_worst_relative_excludes_no_data_live_and_historical():
 
 def test_get_top_n_worst_relative_no_matching_historical_key_excluded():
     """Live segment with no corresponding historical average (no key match) is excluded, not errored."""
+    live_time = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)
+
     live_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=10.0),
-        make_segment(segment_id=2, current_speed=5.0),
+        make_segment(segment_id=1, current_speed=10.0, last_updated=live_time),
+        make_segment(segment_id=2, current_speed=5.0, last_updated=live_time),
     ]
 
     historical_segments: list[TrafficSegment] = [
-        make_segment(segment_id=1, current_speed=15.0),
-        make_segment(segment_id=1, current_speed=20.0),
-        make_segment(segment_id=1, current_speed=25.0),
+        make_segment(
+            segment_id=1, current_speed=15.0, last_updated=live_time - timedelta(days=7)
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=20.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=25.0,
+            last_updated=live_time - timedelta(days=21),
+        ),
     ]
 
     worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
