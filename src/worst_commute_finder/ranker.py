@@ -1,6 +1,28 @@
 from collections import defaultdict
+from math import asin, cos, radians, sin, sqrt
 
 from chicago_traffic.models import TrafficSegment
+
+MAX_CORRIDOR_GAP_MILES = 2
+
+
+def distance_between_segments(
+    segment1: TrafficSegment, segment2: TrafficSegment
+) -> float:
+    # distance from segment1's endpoint to segment2's start point
+    lat1, lon1 = segment1.end_lat, segment1.end_lon
+    lat2, lon2 = segment2.start_lat, segment2.start_lon
+
+    # convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+
+    # haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    r = 3956
+    return c * r
 
 
 def group_into_corridors(
@@ -16,6 +38,7 @@ def group_into_corridors(
     corridors: list[list[TrafficSegment]] = []
     for bucket in buckets:
         # sort by start_lat or start_lon depending on street_heading
+        # right now, diagonal streets are not handled
         if bucket[0].street_heading in ["N", "S"]:
             bucket.sort(key=lambda segment: segment.start_lat)
         else:
