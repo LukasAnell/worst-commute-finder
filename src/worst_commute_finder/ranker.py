@@ -11,7 +11,32 @@ def group_into_corridors(
     for segment in traffic_segments:
         grouped_segments[(segment.street, segment.direction)].append(segment)
 
-    return list(grouped_segments.values())
+    buckets: list[list[TrafficSegment]] = list(grouped_segments.values())
+
+    corridors: list[list[TrafficSegment]] = []
+    for bucket in buckets:
+        # sort by start_lat or start_lon depending on street_heading
+        if bucket[0].street_heading in ["N", "S"]:
+            bucket.sort(key=lambda segment: segment.start_lat)
+        else:
+            bucket.sort(key=lambda segment: segment.start_lon)
+
+        sub_groups: list[list[TrafficSegment]] = []
+        current_group: list[TrafficSegment] = [bucket[0]]
+
+        for segment in bucket[1:]:
+            # distance from previos segment's endpoint to next segment's start point
+            gap: float = distance_between_segments(current_group[-1], segment)
+            if gap > MAX_CORRIDOR_GAP_MILES:
+                sub_groups.append(current_group)
+                current_group = [segment]
+            else:
+                current_group.append(segment)
+        sub_groups.append(current_group)
+
+        corridors.extend(sub_groups)
+
+    return corridors
 
 
 def get_top_n_worst_corridors(
