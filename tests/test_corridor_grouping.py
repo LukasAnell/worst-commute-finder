@@ -56,7 +56,7 @@ def test_close_segments_on_same_street_merge_into_one_corridor():
     corridors: list[list[TrafficSegment]] = group_into_corridors([segment1, segment2])
 
     assert len(corridors) == 1
-    assert set(s.segment_id for s in corridors[0]) == {1, 2}
+    assert {s.segment_id for s in corridors[0]} == {1, 2}
 
 
 def test_far_segments_on_same_street_split_into_separate_corridors():
@@ -168,12 +168,6 @@ def test_chain_of_close_segments_all_merge_into_single_corridor():
 
 
 def test_gap_exactly_at_threshold_boundary():
-    # distance_between_segments is used directly here to construct a case
-    # that lands as close as practical to MAX_CORRIDOR_GAP_MILES, to document
-    # the boundary behavior (currently: strictly greater than splits, equal
-    # or less merges). If this is fiddly to hit exactly due to floating point,
-    # this test's intent is documentation as much as strict verification --
-    # adjust tolerance as needed.
     segment1: TrafficSegment = make_segment(
         segment_id=1,
         street="Test St",
@@ -210,15 +204,15 @@ def test_gap_exactly_at_threshold_boundary():
 
 
 def test_sort_order_uses_start_lat_for_north_south_streets():
-    # Segments given out of order should still be sorted correctly before gap-checking because the street_heading is N/S
+    # Segments given out of order should still be sorted correctly before gap-checking because the street_heading is N/S.
     segment_north = make_segment(
         segment_id=1,
         street="Test St",
         direction="NB",
         street_heading="N",
-        start_lat=41.90,
+        start_lat=41.81 + CLOSE_LAT_DELTA,
         start_lon=-87.70,
-        end_lat=41.91,
+        end_lat=41.82 + CLOSE_LAT_DELTA,
         end_lon=-87.70,
     )
 
@@ -240,6 +234,7 @@ def test_sort_order_uses_start_lat_for_north_south_streets():
 
     # check that they merge
     assert len(corridors) == 1
+    assert {s.segment_id for s in corridors[0]} == {1, 2}
 
 
 def test_sort_order_uses_start_lon_for_east_west_streets():
