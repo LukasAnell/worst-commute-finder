@@ -3,7 +3,7 @@ from math import asin, cos, radians, sin, sqrt
 
 from chicago_traffic.models import TrafficSegment
 
-MAX_CORRIDOR_GAP_MILES = 2
+MAX_CORRIDOR_GAP_MILES: float = 2.0
 
 
 def distance_between_segments(
