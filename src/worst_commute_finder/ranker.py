@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 
 from chicago_traffic.models import TrafficSegment
@@ -113,10 +114,37 @@ def get_top_n_worst_relative(
         segment for segment in historical_segments if segment.has_data
     ]
 
+    # map segment_id -> the live segment's own last_updated field, so any historical reading at or after that moment can be excluded from the baseline
+    live_last_updated_by_segment: dict[int, datetime] = {
+        segment.segment_id: segment.last_updated for segment in valid_live_segments
+    }
+
     # create a dict of historical segments mapping segment_id to a list of speed readings
     historical_speed_dict: dict[tuple[int, int, int], list[float]] = defaultdict(list)
 
+    # dedupe historical readings
+    seen_readings: set[tuple[int, datetime, float]] = set()
+
     for segment in valid_historical_segments:
+        live_cutoff: datetime | None = live_last_updated_by_segment.get(
+            segment.segment_id
+        )
+
+        # exclude readings at or after the live snapshot itself
+        if live_cutoff is not None and segment.last_updated >= live_cutoff:
+            continue
+
+        reading_key: tuple[int, datetime, float] = (
+            segment.segment_id,
+            segment.last_updated,
+            segment.current_speed,
+        )
+
+        # skip duplicate reading
+        if reading_key in seen_readings:
+            continue
+        seen_readings.add(reading_key)
+
         key: tuple[int, int, int] = (
             segment.segment_id,
             segment.last_updated.weekday(),
