@@ -418,6 +418,114 @@ def test_get_top_n_worst_relative_no_matching_historical_key_excluded():
     assert worst_relative[0][1] == -10.0  # 10 - 20
 
 
+def test_get_top_n_worst_relative_excludes_historical_reading_at_or_after_live_timestamp():
+    """A historical reading at or after the live segment's own last_updated is excluded from its baseline, even if it exactly matches the live reading."""
+    live_time: datetime = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)
+
+    live_segments: list[TrafficSegment] = [
+        make_segment(segment_id=1, current_speed=14.0, last_updated=live_time),
+    ]
+
+    historical_segments: list[TrafficSegment] = [
+        # self-match
+        make_segment(segment_id=1, current_speed=14.0, last_updated=live_time),
+        # after live timestamp
+        make_segment(
+            segment_id=1,
+            current_speed=10.0,
+            last_updated=live_time + timedelta(minutes=5),
+        ),
+        make_segment(
+            segment_id=1, current_speed=48.0, last_updated=live_time - timedelta(days=7)
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=52.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=52.0,
+            last_updated=live_time - timedelta(days=21),
+        ),
+    ]
+
+    worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
+        live_segments, historical_segments, n=5
+    )
+
+    assert len(worst_relative) == 1
+
+    # average should be (48 + 52 + 52) / 3 = 50.67
+    expected_average: float = (48.0 + 52.0 + 52.0) / 3
+    assert abs(worst_relative[0][1] - (14.0 - expected_average)) < 0.01
+
+
+def test_get_top_n_worst_relative_dedupes_repeated_historical_readings():
+    """The same reading appearing more than once in historical data is only counted once toward the average."""
+    live_time: datetime = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)
+
+    live_segments: list[TrafficSegment] = [
+        make_segment(segment_id=1, current_speed=14.0, last_updated=live_time),
+    ]
+
+    reading_a_time: datetime = live_time - timedelta(days=7)
+    historical_segments: list[TrafficSegment] = [
+        make_segment(segment_id=1, current_speed=48.0, last_updated=reading_a_time),
+        # exact duplicate of the reading above
+        make_segment(segment_id=1, current_speed=48.0, last_updated=reading_a_time),
+        make_segment(
+            segment_id=1,
+            current_speed=52.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+        make_segment(
+            segment_id=1,
+            current_speed=56.0,
+            last_updated=live_time - timedelta(days=21),
+        ),
+    ]
+
+    worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
+        live_segments, historical_segments, n=5
+    )
+
+    assert len(worst_relative) == 1
+
+    # average should treat the duplicate as ONE reading, so (48 + 52 + 56) / 3 = 52.0,
+    expected_average: float = (48.0 + 52.0 + 56.0) / 3
+    assert abs(worst_relative[0][1] - (14.0 - expected_average)) < 0.01
+
+
+def test_get_top_n_worst_relative_duplicates_dont_inflate_reading_count_past_threshold():
+    """Duplicated readings don't make reading count go over >= 3 threshold."""
+    live_time: datetime = datetime(2026, 1, 5, 8, 0, 0, tzinfo=UTC)
+
+    live_segments: list[TrafficSegment] = [
+        make_segment(segment_id=1, current_speed=14.0, last_updated=live_time),
+    ]
+
+    # only 2 distinct historical readings, but one is repeated 3x -> 4 raw entries
+    reading_a_time: datetime = live_time - timedelta(days=7)
+    historical_segments: list[TrafficSegment] = [
+        make_segment(segment_id=1, current_speed=48.0, last_updated=reading_a_time),
+        make_segment(segment_id=1, current_speed=48.0, last_updated=reading_a_time),
+        make_segment(segment_id=1, current_speed=48.0, last_updated=reading_a_time),
+        make_segment(
+            segment_id=1,
+            current_speed=52.0,
+            last_updated=live_time - timedelta(days=14),
+        ),
+    ]
+
+    worst_relative: list[tuple[TrafficSegment, float]] = get_top_n_worst_relative(
+        live_segments, historical_segments, n=5
+    )
+
+    # only 2 distinct readings -- below the >= 3 threshold, so no result at all
+    assert len(worst_relative) == 0
+
+
 def test_get_top_n_worst_relative_n_zero_or_negative_raises():
     """n <= 0 raises ValueError."""
     live_segments: list[TrafficSegment] = [
